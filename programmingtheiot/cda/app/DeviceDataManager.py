@@ -11,6 +11,7 @@
 # 
 
 import logging
+import time
 
 import programmingtheiot.common.ConfigConst as ConfigConst
 
@@ -219,6 +220,10 @@ class DeviceDataManager(IDataMessageListener):
 		
 		if self.mqttClient:
 			self.mqttClient.connectClient()
+			
+			# Wait for connection to complete before subscribing
+			time.sleep(1)
+			
 			self.mqttClient.subscribeToTopic(ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE, callback = None, qos = ConfigConst.DEFAULT_QOS)
 			
 		logging.info("Started DeviceDataManager.")
