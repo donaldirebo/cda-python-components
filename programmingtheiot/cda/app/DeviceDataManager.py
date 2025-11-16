@@ -1,15 +1,3 @@
-#####
-# 
-# This class is part of the Programming the Internet of Things
-# project, and is available via the MIT License, which can be
-# found in the LICENSE file at the top level of this repository.
-# 
-# You may find it more helpful to your design to adjust the
-# functionality, constants and interfaces (if there are any)
-# provided within in order to meet the needs of your specific
-# Programming the Internet of Things project.
-# 
-
 import logging
 import time
 
@@ -28,6 +16,7 @@ from programmingtheiot.cda.system.SensorAdapterManager import SensorAdapterManag
 from programmingtheiot.cda.system.SystemPerformanceManager import SystemPerformanceManager
 
 from programmingtheiot.cda.connection.MqttClientConnector import MqttClientConnector
+from programmingtheiot.cda.connection.CoapServerAdapter import CoapServerAdapter
 
 class DeviceDataManager(IDataMessageListener):
 	"""
@@ -56,6 +45,11 @@ class DeviceDataManager(IDataMessageListener):
 				section = ConfigConst.CONSTRAINED_DEVICE,
 				key = ConfigConst.ENABLE_MQTT_CLIENT_KEY)
 		
+		self.enableCoapServer = \
+			self.configUtil.getBoolean(
+				section = ConfigConst.CONSTRAINED_DEVICE,
+				key = ConfigConst.ENABLE_COAP_SERVER_KEY)
+		
 		self.sysPerfMgr = None
 		self.sensorAdapterMgr = None
 		self.actuatorAdapterMgr = None
@@ -72,6 +66,13 @@ class DeviceDataManager(IDataMessageListener):
 			self.mqttClient = MqttClientConnector()
 			self.mqttClient.setDataMessageListener(self)
 			logging.info("MQTT client enabled")
+		
+		# CoAP server initialization
+		self.coapServer = None
+		
+		if self.enableCoapServer:
+			self.coapServer = CoapServerAdapter(dataMsgListener = self)
+			logging.info("CoAP server enabled")
 		
 		# NOTE: The following aren't used until Part III
 		self.coapClient = None
@@ -225,6 +226,9 @@ class DeviceDataManager(IDataMessageListener):
 			time.sleep(1)
 			
 			self.mqttClient.subscribeToTopic(ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE, callback = None, qos = ConfigConst.DEFAULT_QOS)
+		
+		if self.coapServer:
+			self.coapServer.startServer()
 			
 		logging.info("Started DeviceDataManager.")
 		
@@ -243,6 +247,9 @@ class DeviceDataManager(IDataMessageListener):
 		if self.mqttClient:
 			self.mqttClient.unsubscribeFromTopic(ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE)
 			self.mqttClient.disconnectClient()
+		
+		if self.coapServer:
+			self.coapServer.stopServer()
 			
 		logging.info("Stopped DeviceDataManager.")
 		
