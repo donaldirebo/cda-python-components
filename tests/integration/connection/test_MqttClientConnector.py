@@ -74,8 +74,13 @@ class MqttClientConnectorTest(unittest.TestCase):
 		
 		self.mcc.disconnectClient()
 
-	@unittest.skip("Ignore for now.")
 	def testNewActuatorCmdPubSub(self):
+		"""
+		Test PIOT-CDA-10-003: Actuator Command Message Subscription
+		
+		Tests that MqttClientConnector properly subscribes to actuator command
+		messages and routes them to the IDataMessageListener instance.
+		"""
 		qos = 1
 	
 		# NOTE: delay can be anything you'd like - the sleep() calls are simply to slow things down a bit for observation
@@ -94,7 +99,7 @@ class MqttClientConnectorTest(unittest.TestCase):
 		sleep(delay)
 		
 		self.mcc.disconnectClient()
-		
+
 	@unittest.skip("Ignore for now.")
 	def testActuatorCmdPubSub(self):
 		qos = 0
@@ -151,7 +156,7 @@ class MqttClientConnectorTest(unittest.TestCase):
 		
 		self.mcc.disconnectClient()
 
-	#@unittest.skip("Ignore for now.")
+	@unittest.skip("Ignore for now.")
 	def testCDAActuatorCmdSubscribe(self):
 		qos = 1
 		delay = self.cfg.getInteger(ConfigConst.MQTT_GATEWAY_SERVICE, ConfigConst.KEEP_ALIVE_KEY, ConfigConst.DEFAULT_KEEP_ALIVE)

@@ -72,6 +72,9 @@ class SensorAdapterManager(object):
 	def _initEnvironmentalSensorTasks(self):
 		"""
 		Initializes the environmental sensor simulator tasks.
+		
+		NOTE: Both emulator and simulator modes use the same simulator tasks.
+		The adapters are always created, regardless of the enableEmulator setting.
 		"""
 		humidityFloor = \
 			self.configUtil.getFloat(
@@ -106,26 +109,27 @@ class SensorAdapterManager(object):
 				key = ConfigConst.TEMP_SIM_CEILING_KEY, 
 				defaultVal = SensorDataGenerator.HI_NORMAL_INDOOR_TEMP)
 		
-		if not self.useEmulator:
-			logging.info("Using simulators for sensor data generation.")
-			
-			self.dataGenerator = SensorDataGenerator()
-			
-			humidityData = \
-				self.dataGenerator.generateDailyEnvironmentHumidityDataSet(
-					minValue = humidityFloor, maxValue = humidityCeiling, useSeconds = False)
-			pressureData = \
-				self.dataGenerator.generateDailyEnvironmentPressureDataSet(
-					minValue = pressureFloor, maxValue = pressureCeiling, useSeconds = False)
-			tempData = \
-				self.dataGenerator.generateDailyIndoorTemperatureDataSet(
-					minValue = tempFloor, maxValue = tempCeiling, useSeconds = False)
-			
-			self.humidityAdapter = HumiditySensorSimTask(dataSet = humidityData)
-			self.pressureAdapter = PressureSensorSimTask(dataSet = pressureData)
-			self.tempAdapter = TemperatureSensorSimTask(dataSet = tempData)
-		else:
+		if self.useEmulator:
 			logging.info("Using emulators for sensor data generation.")
+		else:
+			logging.info("Using simulators for sensor data generation.")
+		
+		# Always create the sensor simulator tasks
+		self.dataGenerator = SensorDataGenerator()
+		
+		humidityData = \
+			self.dataGenerator.generateDailyEnvironmentHumidityDataSet(
+				minValue = humidityFloor, maxValue = humidityCeiling, useSeconds = False)
+		pressureData = \
+			self.dataGenerator.generateDailyEnvironmentPressureDataSet(
+				minValue = pressureFloor, maxValue = pressureCeiling, useSeconds = False)
+		tempData = \
+			self.dataGenerator.generateDailyIndoorTemperatureDataSet(
+				minValue = tempFloor, maxValue = tempCeiling, useSeconds = False)
+		
+		self.humidityAdapter = HumiditySensorSimTask(dataSet = humidityData)
+		self.pressureAdapter = PressureSensorSimTask(dataSet = pressureData)
+		self.tempAdapter = TemperatureSensorSimTask(dataSet = tempData)
 
 	def handleTelemetry(self):
 		"""
