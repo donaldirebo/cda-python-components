@@ -24,6 +24,8 @@ from programmingtheiot.cda.sim.HumiditySensorSimTask import HumiditySensorSimTas
 from programmingtheiot.cda.sim.TemperatureSensorSimTask import TemperatureSensorSimTask
 from programmingtheiot.cda.sim.PressureSensorSimTask import PressureSensorSimTask
 
+from programmingtheiot.cda.emulated.AccelerometerSensorEmulatorTask import AccelerometerSensorEmulatorTask
+
 class SensorAdapterManager(object):
 	"""
 	Manages sensor adapters and schedules periodic telemetry collection.
@@ -65,6 +67,7 @@ class SensorAdapterManager(object):
 		self.humidityAdapter = None
 		self.pressureAdapter = None
 		self.tempAdapter = None
+		self.accelerometerAdapter = None
 		
 		# Initialize sensor tasks
 		self._initEnvironmentalSensorTasks()
@@ -130,6 +133,11 @@ class SensorAdapterManager(object):
 		self.humidityAdapter = HumiditySensorSimTask(dataSet = humidityData)
 		self.pressureAdapter = PressureSensorSimTask(dataSet = pressureData)
 		self.tempAdapter = TemperatureSensorSimTask(dataSet = tempData)
+		
+		# Initialize accelerometer sensor (emulator only)
+		if self.useEmulator:
+			self.accelerometerAdapter = AccelerometerSensorEmulatorTask()
+			logging.info("Accelerometer sensor emulator initialized.")
 
 	def handleTelemetry(self):
 		"""
@@ -152,6 +160,15 @@ class SensorAdapterManager(object):
 			self.dataMsgListener.handleSensorMessage(pressureData)
 			self.dataMsgListener.handleSensorMessage(tempData)
 		
+		# Handle accelerometer telemetry if emulator is enabled
+		if self.accelerometerAdapter:
+			accelerometerData = self.accelerometerAdapter.generateTelemetry()
+			accelerometerData.setLocationID(self.locationID)
+			logging.debug('Generated accelerometer data: ' + str(accelerometerData))
+			
+			if self.dataMsgListener:
+				self.dataMsgListener.handleSensorMessage(accelerometerData)
+		
 	def setDataMessageListener(self, listener: IDataMessageListener) -> bool:
 		"""
 		Sets the data message listener for sensor messages.
@@ -161,6 +178,9 @@ class SensorAdapterManager(object):
 		"""
 		if listener:
 			self.dataMsgListener = listener
+			# Pass listener to accelerometer for individual axis data
+			if self.accelerometerAdapter:
+				self.accelerometerAdapter.setDataMessageListener(listener)
 			return True
 		return False
 	

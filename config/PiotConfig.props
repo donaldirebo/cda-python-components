@@ -34,6 +34,7 @@ enableCrypt    = False
 # CDA specific configuration information
 #
 [ConstrainedDevice]
+runForever = True
 deviceLocationID = constraineddevice001
 enableEmulator   = True
 enableSenseHAT   = False
@@ -54,10 +55,14 @@ pressureSimFloor   =  990.0
 pressureSimCeiling = 1010.0
 tempSimFloor       =   15.0
 tempSimCeiling     =   25.0
-# configurable limits for actuator triggers
+# configurable limits for actuator triggers - temperature
 handleTempChangeOnDevice = True
 triggerHvacTempFloor     = 18.0
 triggerHvacTempCeiling   = 20.0
+# configurable limits for actuator triggers - tilt/accelerometer
+handleTiltChangeOnDevice = True
+triggerTiltMaxAngle      = 15.0
+tiltMaxTimePastThreshold = 10
 # camera settings
 streamHostAddr      = 127.0.0.1
 streamHostLabel     = localhost

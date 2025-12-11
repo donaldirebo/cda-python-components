@@ -92,6 +92,7 @@ class DeviceDataManager(IDataMessageListener):
 			self.actuatorAdapterMgr = ActuatorAdapterManager(dataMsgListener = self)
 			logging.info("Local actuation capabilities enabled")
 		
+		# Temperature threshold configuration
 		self.handleTempChangeOnDevice = \
 			self.configUtil.getBoolean(
 				ConfigConst.CONSTRAINED_DEVICE, 
@@ -106,6 +107,21 @@ class DeviceDataManager(IDataMessageListener):
 			self.configUtil.getFloat(
 				ConfigConst.CONSTRAINED_DEVICE, 
 				ConfigConst.TRIGGER_HVAC_TEMP_CEILING_KEY)
+		
+		# Tilt/Accelerometer threshold configuration
+		self.handleTiltChangeOnDevice = \
+			self.configUtil.getBoolean(
+				ConfigConst.CONSTRAINED_DEVICE, 
+				ConfigConst.HANDLE_TILT_CHANGE_ON_DEVICE_KEY)
+		
+		self.triggerTiltMaxAngle = \
+			self.configUtil.getFloat(
+				ConfigConst.CONSTRAINED_DEVICE, 
+				ConfigConst.TRIGGER_TILT_MAX_ANGLE_KEY,
+				defaultVal = 15.0)
+		
+		# Track tilt alert state to avoid repeated triggers
+		self.tiltAlertActive = False
 		
 	def getLatestActuatorDataResponseFromCache(self, name: str = None) -> ActuatorData:
 		"""
@@ -285,7 +301,10 @@ class DeviceDataManager(IDataMessageListener):
 	def _handleSensorDataAnalysis(self, data: SensorData):
 		"""
 		Analyzes sensor data and triggers actuator commands if needed.
+		
+		Handles both temperature and tilt/accelerometer threshold checking.
 		"""
+		# Handle temperature threshold checking
 		if self.handleTempChangeOnDevice and data.getTypeID() == ConfigConst.TEMP_SENSOR_TYPE:
 			logging.info("Handle temp change: %s - type ID: %s", str(self.handleTempChangeOnDevice), str(data.getTypeID()))
 			
@@ -302,6 +321,34 @@ class DeviceDataManager(IDataMessageListener):
 				ad.setCommand(ConfigConst.COMMAND_OFF)
 				
 			self.handleActuatorCommandMessage(ad)
+		
+		# Handle tilt/accelerometer threshold checking
+		if self.handleTiltChangeOnDevice and data.getTypeID() == ConfigConst.ACCELEROMETER_SENSOR_TYPE:
+			logging.info("Handle tilt change: %s - type ID: %s", str(self.handleTiltChangeOnDevice), str(data.getTypeID()))
+			
+			ad = ActuatorData(typeID = ConfigConst.TILT_ALERT_ACTUATOR_TYPE)
+			ad.setLocationID(data.getLocationID())
+			
+			currentTilt = data.getValue()
+			
+			if currentTilt > self.triggerTiltMaxAngle:
+				# Tilt exceeds threshold - activate alert
+				if not self.tiltAlertActive:
+					logging.warning("TILT THRESHOLD EXCEEDED: %.1f° > %.1f° - Activating alert!", 
+						currentTilt, self.triggerTiltMaxAngle)
+					ad.setCommand(ConfigConst.COMMAND_ON)
+					ad.setValue(currentTilt)
+					self.tiltAlertActive = True
+					self.handleActuatorCommandMessage(ad)
+			else:
+				# Tilt within safe range - deactivate alert if active
+				if self.tiltAlertActive:
+					logging.info("Tilt returned to safe range: %.1f° <= %.1f° - Deactivating alert.", 
+						currentTilt, self.triggerTiltMaxAngle)
+					ad.setCommand(ConfigConst.COMMAND_OFF)
+					ad.setValue(currentTilt)
+					self.tiltAlertActive = False
+					self.handleActuatorCommandMessage(ad)
 	
 	def _handleUpstreamTransmission(self, resourceName: ResourceNameEnum, msg: str):
 		"""
