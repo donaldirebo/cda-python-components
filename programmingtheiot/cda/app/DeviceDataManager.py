@@ -10,6 +10,7 @@ from programmingtheiot.common.ResourceNameEnum import ResourceNameEnum
 from programmingtheiot.data.ActuatorData import ActuatorData
 from programmingtheiot.data.SensorData import SensorData
 from programmingtheiot.data.SystemPerformanceData import SystemPerformanceData
+from programmingtheiot.data.DataUtil import DataUtil
 
 from programmingtheiot.cda.system.ActuatorAdapterManager import ActuatorAdapterManager
 from programmingtheiot.cda.system.SensorAdapterManager import SensorAdapterManager
@@ -91,6 +92,7 @@ class DeviceDataManager(IDataMessageListener):
 			self.actuatorAdapterMgr = ActuatorAdapterManager(dataMsgListener = self)
 			logging.info("Local actuation capabilities enabled")
 		
+		# Temperature threshold configuration
 		self.handleTempChangeOnDevice = \
 			self.configUtil.getBoolean(
 				ConfigConst.CONSTRAINED_DEVICE, 
@@ -105,6 +107,21 @@ class DeviceDataManager(IDataMessageListener):
 			self.configUtil.getFloat(
 				ConfigConst.CONSTRAINED_DEVICE, 
 				ConfigConst.TRIGGER_HVAC_TEMP_CEILING_KEY)
+		
+		# Tilt/Accelerometer threshold configuration
+		self.handleTiltChangeOnDevice = \
+			self.configUtil.getBoolean(
+				ConfigConst.CONSTRAINED_DEVICE, 
+				ConfigConst.HANDLE_TILT_CHANGE_ON_DEVICE_KEY)
+		
+		self.triggerTiltMaxAngle = \
+			self.configUtil.getFloat(
+				ConfigConst.CONSTRAINED_DEVICE, 
+				ConfigConst.TRIGGER_TILT_MAX_ANGLE_KEY,
+				defaultVal = 15.0)
+		
+		# Track tilt alert state to avoid repeated triggers
+		self.tiltAlertActive = False
 		
 	def getLatestActuatorDataResponseFromCache(self, name: str = None) -> ActuatorData:
 		"""
@@ -138,7 +155,10 @@ class DeviceDataManager(IDataMessageListener):
 		
 		if data:
 			logging.info("Processing actuator command message.")
-			return self.actuatorAdapterMgr.sendActuatorCommand(data)
+			response = self.actuatorAdapterMgr.sendActuatorCommand(data)
+			if response:
+				logging.info("Incoming actuator response received (from actuator manager): " + str(response))
+			return response
 		else:
 			logging.warning("Incoming actuator command is invalid (null). Ignoring.")
 			return None
@@ -173,17 +193,26 @@ class DeviceDataManager(IDataMessageListener):
 	def handleSensorMessage(self, data: SensorData) -> bool:
 		"""
 		Callback for incoming sensor messages.
+		
+		PIOT-CDA-10-004: Sends sensor data upstream to GDA via MQTT
 		"""
 		if data:
-			logging.debug("Incoming sensor data received (from sensor manager): " + str(data))
+			logging.info("Incoming sensor data received (from sensor manager): " + str(data))
 			
 			# Store in cache
 			self.sensorDataCache[data.getName()] = data
 			
-			# Analyze sensor data
-			self._handleSensorDataAnalysis(data = data)
+			# Step 1: Analyze sensor data (check thresholds, trigger actuators)
+			self._handleSensorDataAnalysis(data=data)
 			
-			# TODO: In Part III, send upstream
+			# Step 2: Convert to JSON
+			jsonData = DataUtil().sensorDataToJson(data=data)
+			
+			# Step 3: Send upstream to GDA via MQTT
+			self._handleUpstreamTransmission(
+				resourceName=ResourceNameEnum.CDA_SENSOR_MSG_RESOURCE, 
+				msg=jsonData
+			)
 			
 			return True
 		else:
@@ -193,14 +222,23 @@ class DeviceDataManager(IDataMessageListener):
 	def handleSystemPerformanceMessage(self, data: SystemPerformanceData) -> bool:
 		"""
 		Callback for incoming system performance messages.
+		
+		PIOT-CDA-10-004: Sends system performance data upstream to GDA via MQTT
 		"""
 		if data:
-			logging.debug("Incoming system performance message received (from sys perf manager): " + str(data))
+			logging.info("Incoming system performance message received (from sys perf manager): " + str(data))
 			
 			# Store in cache
 			self.systemPerformanceDataCache[data.getName()] = data
 			
-			# TODO: In Part III, send upstream
+			# Step 1: Convert to JSON
+			jsonData = DataUtil().systemPerformanceDataToJson(data=data)
+			
+			# Step 2: Send upstream to GDA via MQTT
+			self._handleUpstreamTransmission(
+				resourceName=ResourceNameEnum.CDA_SYSTEM_PERF_MSG_RESOURCE, 
+				msg=jsonData
+			)
 			
 			return True
 		else:
@@ -263,7 +301,10 @@ class DeviceDataManager(IDataMessageListener):
 	def _handleSensorDataAnalysis(self, data: SensorData):
 		"""
 		Analyzes sensor data and triggers actuator commands if needed.
+		
+		Handles both temperature and tilt/accelerometer threshold checking.
 		"""
+		# Handle temperature threshold checking
 		if self.handleTempChangeOnDevice and data.getTypeID() == ConfigConst.TEMP_SENSOR_TYPE:
 			logging.info("Handle temp change: %s - type ID: %s", str(self.handleTempChangeOnDevice), str(data.getTypeID()))
 			
@@ -281,9 +322,54 @@ class DeviceDataManager(IDataMessageListener):
 				
 			self.handleActuatorCommandMessage(ad)
 		
+		# Handle tilt/accelerometer threshold checking
+		if self.handleTiltChangeOnDevice and data.getTypeID() == ConfigConst.ACCELEROMETER_SENSOR_TYPE:
+			logging.info("Handle tilt change: %s - type ID: %s", str(self.handleTiltChangeOnDevice), str(data.getTypeID()))
+			
+			ad = ActuatorData(typeID = ConfigConst.TILT_ALERT_ACTUATOR_TYPE)
+			ad.setLocationID(data.getLocationID())
+			
+			currentTilt = data.getValue()
+			
+			if currentTilt > self.triggerTiltMaxAngle:
+				# Tilt exceeds threshold - activate alert
+				if not self.tiltAlertActive:
+					logging.warning("TILT THRESHOLD EXCEEDED: %.1f° > %.1f° - Activating alert!", 
+						currentTilt, self.triggerTiltMaxAngle)
+					ad.setCommand(ConfigConst.COMMAND_ON)
+					ad.setValue(currentTilt)
+					self.tiltAlertActive = True
+					self.handleActuatorCommandMessage(ad)
+			else:
+				# Tilt within safe range - deactivate alert if active
+				if self.tiltAlertActive:
+					logging.info("Tilt returned to safe range: %.1f° <= %.1f° - Deactivating alert.", 
+						currentTilt, self.triggerTiltMaxAngle)
+					ad.setCommand(ConfigConst.COMMAND_OFF)
+					ad.setValue(currentTilt)
+					self.tiltAlertActive = False
+					self.handleActuatorCommandMessage(ad)
+	
 	def _handleUpstreamTransmission(self, resourceName: ResourceNameEnum, msg: str):
 		"""
-		Sends messages upstream to GDA or cloud.
+		Sends sensor and system performance data upstream to GDA via MQTT.
+		
+		PIOT-CDA-10-004: Upstream Transmission
 		"""
-		# TODO: Implement in Part III
-		pass
+		if not resourceName or not msg:
+			logging.warning('Invalid resource or message. Cannot send upstream transmission.')
+			return
+		
+		logging.info('Upstream transmission invoked. Checking communications integration.')
+		
+		# Use MQTT client to publish the message
+		if self.mqttClient:
+			try:
+				if self.mqttClient.publishMessage(resource=resourceName, msg=msg, qos=1):
+					logging.info('Published incoming data to resource (MQTT): %s', str(resourceName))
+				else:
+					logging.warning('Failed to publish incoming data to resource (MQTT): %s', str(resourceName))
+			except Exception as e:
+				logging.error('Exception while publishing upstream transmission: %s', str(e))
+		else:
+			logging.warning('MQTT client not available. Cannot send upstream transmission.')

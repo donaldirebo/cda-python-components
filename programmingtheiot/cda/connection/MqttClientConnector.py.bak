@@ -13,7 +13,6 @@ from programmingtheiot.common.IDataMessageListener import IDataMessageListener
 from programmingtheiot.common.ResourceNameEnum import ResourceNameEnum
 
 from programmingtheiot.cda.connection.IPubSubClient import IPubSubClient
-from programmingtheiot.data.DataUtil import DataUtil
 
 
 class MqttClientConnector(IPubSubClient):
@@ -152,7 +151,7 @@ class MqttClientConnector(IPubSubClient):
         
         # Publish message and wait for completion
         msgInfo = self.mqttClient.publish(topic=resource.value, payload=msg, qos=qos)
-        # msgInfo.wait_for_publish()  # Commented to avoid deadlock
+        msgInfo.wait_for_publish()
         
         return True
     
@@ -206,36 +205,33 @@ class MqttClientConnector(IPubSubClient):
         return True
     
     
-    def setDataMessageListener(self, listener = None) -> bool:
-        """Set the data message listener for handling incoming messages."""
+    def setDataMessageListener(self, listener: IDataMessageListener = None) -> bool:
+        """
+        Set the data message listener for handling incoming messages.
+        
+        Args:
+            listener: IDataMessageListener implementation to handle messages.
+        
+        Returns:
+            bool: True if listener set, False if listener is None.
+        """
         if listener:
             self.dataMsgListener = listener
             return True
         else:
-            logging.warning('Listener is None.')
+            logging.warning('Listener is None. Not setting data message listener.')
             return False
     
-    def onActuatorCommandMessage(self, client, userdata, msg):
-        """Callback for incoming actuator command messages."""
-        logging.info('[Callback] Actuator command message received. Topic: %s.', msg.topic)
-        if self.dataMsgListener:
-            try:
-                actuatorData = DataUtil().jsonToActuatorData(msg.payload.decode('utf-8'))
-                self.dataMsgListener.handleActuatorCommandMessage(actuatorData)
-            except Exception as e:
-                logging.exception("Failed to convert actuator command payload: %s", str(e))
-
-
+    
+    # ============================================
+    # MQTT Callback Handlers (Public)
+    # ============================================
     
     def onConnect(self, client, userdata, flags, rc):
         """
         Callback for when the client connects to the broker.
         """
         logging.info('MQTT client connected to broker: ' + str(client))
-        
-        # Subscribe to actuator command topic
-        self.mqttClient.subscribe(topic=ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE.value, qos=self.defaultQos)
-        self.mqttClient.message_callback_add(sub=ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE.value, callback=self.onActuatorCommandMessage)
     
     
     def onDisconnect(self, client, userdata, rc):

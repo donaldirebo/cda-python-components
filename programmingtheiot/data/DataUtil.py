@@ -20,7 +20,10 @@ class DataUtil():
         if not data:
             logging.debug("ActuatorData is null. Returning empty string.")
             return ""
-        return self._generateJsonData(obj=data, useDecForFloat=useDecForFloat)
+        logging.info("Encoding ActuatorData to JSON [pre] --> " + str(data))
+        jsonData = self._generateJsonData(obj=data, useDecForFloat=useDecForFloat)
+        logging.info("Encoding ActuatorData to JSON [post] --> " + str(jsonData))
+        return jsonData
     
     def sensorDataToJson(self, data: SensorData = None, useDecForFloat: bool = False):
         if not data:

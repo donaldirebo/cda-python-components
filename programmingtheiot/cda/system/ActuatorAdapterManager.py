@@ -21,6 +21,8 @@ from programmingtheiot.data.ActuatorData import ActuatorData
 from programmingtheiot.cda.sim.HvacActuatorSimTask import HvacActuatorSimTask
 from programmingtheiot.cda.sim.HumidifierActuatorSimTask import HumidifierActuatorSimTask
 
+from programmingtheiot.cda.emulated.TiltAlertActuatorTask import TiltAlertActuatorTask
+
 class ActuatorAdapterManager(object):
 	"""
 	Manages actuator adapters and processes actuation commands.
@@ -53,6 +55,7 @@ class ActuatorAdapterManager(object):
 		self.humidifierActuator = None
 		self.hvacActuator = None
 		self.ledDisplayActuator = None
+		self.tiltAlertActuator = None
 		
 		# Initialize actuator tasks
 		self._initEnvironmentalActuationTasks()
@@ -71,6 +74,10 @@ class ActuatorAdapterManager(object):
 			self.hvacActuator = HvacActuatorSimTask()
 		else:
 			logging.info("Using emulators for actuator commands.")
+			
+			# Initialize tilt alert actuator for emulator mode
+			self.tiltAlertActuator = TiltAlertActuatorTask()
+			logging.info("Tilt alert actuator emulator initialized.")
 
 	def sendActuatorCommand(self, data: ActuatorData) -> ActuatorData:
 		"""
@@ -93,6 +100,8 @@ class ActuatorAdapterManager(object):
 					responseData = self.hvacActuator.updateActuator(data)
 				elif aType == ConfigConst.LED_DISPLAY_ACTUATOR_TYPE and self.ledDisplayActuator:
 					responseData = self.ledDisplayActuator.updateActuator(data)
+				elif aType == ConfigConst.TILT_ALERT_ACTUATOR_TYPE and self.tiltAlertActuator:
+					responseData = self.tiltAlertActuator.updateActuator(data)
 				else:
 					logging.warning("No valid actuator type. Ignoring actuation for type: %s", data.getTypeID())
 					

@@ -35,12 +35,17 @@ class DeviceDataManagerIntegrationTest(unittest.TestCase):
 	test case from the command line, as it will likely fail
 	if run within an IDE in native Windows.
 	
+	PIOT-CDA-10-004: This test now validates upstream transmission of
+	sensor data and system performance data to the GDA via MQTT.
 	"""
 	
 	@classmethod
-	def setUpClass(self):
+	def setUpClass(cls):
 		logging.basicConfig(format = '%(asctime)s:%(module)s:%(levelname)s:%(message)s', level = logging.DEBUG)
+		logging.info("="*70)
 		logging.info("Testing DeviceDataManager class...")
+		logging.info("PIOT-CDA-10-004: Upstream Transmission Integration Test")
+		logging.info("="*70)
 		
 	def setUp(self):
 		pass
@@ -48,15 +53,44 @@ class DeviceDataManagerIntegrationTest(unittest.TestCase):
 	def tearDown(self):
 		pass
 
-	@unittest.skip("Ignore for now.")
 	def testDeviceDataMgrTimedIntegration(self):
+		"""
+		PIOT-CDA-10-004: Upstream Transmission Integration Test
+		
+		This test validates that DeviceDataManager properly sends sensor data
+		and system performance data to the GDA via MQTT.
+		
+		Expected behavior:
+		- Sensor data published every poll cycle (~5 seconds)
+		- System performance data published every poll cycle
+		- Temperature threshold violations trigger actuator commands
+		- All messages logged with "Published incoming data to resource (MQTT)"
+		"""
+		logging.info("-"*70)
+		logging.info("Test: testDeviceDataMgrTimedIntegration()")
+		logging.info("-"*70)
+		
+		logging.info("Creating DeviceDataManager instance...")
 		ddMgr = DeviceDataManager()
+		
+		logging.info("Starting DeviceDataManager...")
 		ddMgr.startManager()
+		
+		logging.info("-"*70)
+		logging.info("Running integration test for 60 seconds")
+		logging.info("Watch console for:")
+		logging.info("  - Sensor data being published to MQTT")
+		logging.info("  - System performance data being published to MQTT")
+		logging.info("  - Optional: Adjust SenseHAT emulator temp to cross thresholds")
+		logging.info("-"*70)
 		
 		sleep(60)
 		
+		logging.info("-"*70)
+		logging.info("Stopping DeviceDataManager...")
 		ddMgr.stopManager()
+		logging.info("Integration test complete!")
+		logging.info("-"*70)
 		
 if __name__ == "__main__":
 	unittest.main()
-	
