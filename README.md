@@ -437,15 +437,7 @@ Contributions are welcome! Please follow these guidelines:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👨‍💻 Author
 
-**Donald** - Senior Database Engineer transitioning to DevOps Engineering
-
-- 🎓 MSc Cyber-Physical Systems @ Northeastern University
-- 💼 8+ years experience in SQL & Database Engineering
-- 🌐 LinkedIn: [Your LinkedIn Profile]
-- 📧 Email: your.email@example.com
-- 🐙 GitHub: [Your GitHub Profile]
 
 ## 🙏 Acknowledgments
 
@@ -478,3 +470,4 @@ For questions, issues, or feature requests:
 **Built with ❤️ for secure, scalable IoT infrastructure**
 
 *Last Updated: January 2026*
+
